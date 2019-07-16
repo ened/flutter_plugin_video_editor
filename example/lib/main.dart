@@ -5,10 +5,12 @@ import 'dart:async';
 
 import 'package:media_info/media_info.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_editor/video_editor.dart';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() => runApp(MyApp());
 
@@ -32,12 +34,18 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
+    PermissionHandler().requestPermissions([PermissionGroup.storage]);
+
     SharedPreferences.getInstance().then((pref) {
       final String path = pref.getString(_kPrefLastFileName);
       if (path?.isNotEmpty == true && mounted) {
-        getApplicationDocumentsDirectory().then((d) {
-          _loadFile('${d.path}/$path');
-        });
+        if (Platform.isIOS) {
+          getApplicationDocumentsDirectory().then((d) {
+            _loadFile('${d.path}/$path');
+          });
+        } else {
+          _loadFile(path);
+        }
       }
 
       final bool spo = pref.getBool(_kPrefShowPerformanceOverlay);
@@ -155,7 +163,15 @@ class _MyAppState extends State<MyApp> {
                       },
                     ),
                   ],
-                )
+                ),
+              if (snapshot.data.progress == 1.0 &&
+                  snapshot.data.error == null) ...[
+                SizedBox(height: 8),
+                Builder(builder: (context) {
+                  print('Output: ${snapshot.data.output}');
+                  return Text('Output: ${snapshot.data.output}');
+                }),
+              ],
             ],
           );
         },
@@ -198,8 +214,13 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _loadFile(String path) async {
     print('Path: $path');
-    await SharedPreferences.getInstance()
-        .then((p) => p.setString(_kPrefLastFileName, path.split('/').last));
+    final preferences = await SharedPreferences.getInstance();
+    
+    if (Platform.isIOS) {
+      preferences.setString(_kPrefLastFileName, path.split('/').last);
+    } else {
+      preferences.setString(_kPrefLastFileName, path);
+    }
 
     final info = await MediaInfo().getMediaInfo(path);
 
