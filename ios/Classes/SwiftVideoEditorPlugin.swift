@@ -28,7 +28,14 @@ public class SwiftVideoEditorPlugin: NSObject, FlutterPlugin {
         if call.method == "trimVideo" {
             if let dict = call.arguments as? [String : Any] {
                 do {
-                    try handleTrimVideo(dict, result: result)
+                    let input = dict["input"] as! String
+                    let output = dict["output"] as! String
+                    let keepAudio = dict["keepAudio"] as! Bool
+                    let startMs = dict["startMs"] as! Int
+                    let endMs = dict["endMs"] as! Int
+
+                    try handleTrimVideo(input, output, keepAudio: keepAudio, startMs: startMs, endMs: endMs)
+                    result(nil)
                 } catch {
                     result(FlutterError(code: call.method, message: "internal error", details: nil))
                 }
@@ -46,16 +53,10 @@ public class SwiftVideoEditorPlugin: NSObject, FlutterPlugin {
     
     private var progressTimer: Timer? = nil
     
-    private func handleTrimVideo(_ arguments: [String : Any], result: @escaping FlutterResult) throws {
-        
-        let input = arguments["input"] as! String
+    private func handleTrimVideo(_ input: String, _ output: String, keepAudio: Bool, startMs: Int, endMs: Int) throws {
         let sourceAsset = AVAsset(url: URL(fileURLWithPath: input))
-        let output = arguments["output"] as! String
-        
-        let keepAudio = arguments["keepAudio"] as! Bool
-        
-        let startS = Float64(arguments["startMs"] as! Int) / 1000.0
-        let endS = Float64(arguments["endMs"] as! Int) / 1000.0
+        let startS = Float64(startMs) / 1000.0
+        let endS = Float64(endMs) / 1000.0
         
         let newStart = CMTime(value: Int64(startS * Float64(sourceAsset.duration.timescale)), timescale: sourceAsset.duration.timescale)
         let newEnd = CMTime(value: Int64(endS * Float64(sourceAsset.duration.timescale)), timescale: sourceAsset.duration.timescale)
@@ -104,7 +105,7 @@ public class SwiftVideoEditorPlugin: NSObject, FlutterPlugin {
                         "output": output,
                         "progress": NSNumber(value: 0.0),
                         "errorIndex": 5
-                        ] )
+                        ])
                     
                 case .completed:
                     self.progressSink?([
